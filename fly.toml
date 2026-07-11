@@ -1,0 +1,20 @@
+app = "inex-saros"
+primary_region = "syd"
+
+[build]
+  image = "ghcr.io/inex-rs/saros:latest"
+
+[[mounts]]
+  source = "saros_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "off"
+
+  [[http_service.checks]]
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "10s"
+    path = "/readyz"

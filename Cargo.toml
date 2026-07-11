@@ -1,0 +1,44 @@
+[package]
+name = "saros"
+description = "Saros, inex's hosted firmware registry: content-addressed blobs + versioned manifests over ConnectRPC"
+version = "0.1.0"
+edition = "2024"
+license = "GPL-3.0-or-later"
+keywords = ["firmware", "registry", "connectrpc", "webauthn"]
+categories = ["web-programming::http-server"]
+
+[dependencies]
+inex-protobufs = { version = "0.2.0", default-features = false, features = ["connect"] }
+inex-devices = "0.1.0"
+connectrpc = { version = "0.8", features = ["axum", "server"] }
+axum = "0.8"
+tower-http = { version = "0.7", features = ["catch-panic", "cors", "limit"] }
+http = "1"
+tokio = { version = "1", features = ["full"] }
+futures = "0.3"
+object_store = { version = "0.14", features = ["aws"] }
+notify = "8"
+toasty = "0.8"
+toasty-driver-sqlite = "0.8"
+parking_lot = "0.12"
+webauthn-rs = { version = "0.5", features = ["conditional-ui"] }
+webauthn-rs-proto = "0.5"
+uuid = { version = "1", features = ["v4", "serde"] }
+url = "2"
+getrandom = "0.4"
+hex = "0.4"
+woothee = "0.13"
+clap = { version = "4", features = ["derive", "env"] }
+dotenvy = "0.15"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.11"
+thiserror = "2"
+anyhow = "1"
+governor = "0.10"
+strum = { version = "0.28", features = ["derive"] }
+
+[dev-dependencies]
+tempfile = "3"
