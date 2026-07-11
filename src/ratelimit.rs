@@ -80,12 +80,10 @@ fn bucket(per_min: u32) -> Option<Arc<DefaultKeyedRateLimiter<IpAddr>>> {
     Some(Arc::new(DefaultKeyedRateLimiter::keyed(quota)))
 }
 
-/// Resolve the client's IP, Fly-first: `Fly-Client-IP`, then the first
-/// `X-Forwarded-For` hop, then the `ConnectInfo` peer (local dev). `None` if none.
+/// Resolve the client's IP: the first `X-Forwarded-For` hop, set by the
+/// fronting reverse proxy (any of nginx/Caddy/Cloudflare/Fly/…), else the
+/// `ConnectInfo` peer (no proxy / local dev). `None` if neither resolves.
 pub fn client_ip(headers: &HeaderMap, peer: Option<SocketAddr>) -> Option<IpAddr> {
-    if let Some(ip) = header_ip(headers, "fly-client-ip") {
-        return Some(ip);
-    }
     if let Some(forwarded) = headers.get("x-forwarded-for").and_then(|v| v.to_str().ok())
         && let Some(ip) = forwarded
             .split(',')
@@ -95,10 +93,6 @@ pub fn client_ip(headers: &HeaderMap, peer: Option<SocketAddr>) -> Option<IpAddr
         return Some(ip);
     }
     peer.map(|addr| addr.ip())
-}
-
-fn header_ip(headers: &HeaderMap, name: &str) -> Option<IpAddr> {
-    headers.get(name)?.to_str().ok()?.trim().parse().ok()
 }
 
 /// axum middleware: charge each request against its per-IP bucket, returning
@@ -191,18 +185,15 @@ mod tests {
     }
 
     #[test]
-    fn client_ip_resolution_is_fly_first() {
+    fn client_ip_prefers_forwarded_for() {
         let peer = "10.1.2.3:5555".parse::<SocketAddr>().unwrap();
 
-        let mut headers = HeaderMap::new();
-        headers.insert("fly-client-ip", "1.2.3.4".parse().unwrap());
-        headers.insert("x-forwarded-for", "5.6.7.8, 9.9.9.9".parse().unwrap());
-        assert_eq!(client_ip(&headers, Some(peer)), Some(ip("1.2.3.4")));
-
+        // The first X-Forwarded-For hop is the client, ahead of the socket peer.
         let mut headers = HeaderMap::new();
         headers.insert("x-forwarded-for", "5.6.7.8, 9.9.9.9".parse().unwrap());
         assert_eq!(client_ip(&headers, Some(peer)), Some(ip("5.6.7.8")));
 
+        // No forwarding header → the ConnectInfo peer (local dev / no proxy).
         assert_eq!(
             client_ip(&HeaderMap::new(), Some(peer)),
             Some(ip("10.1.2.3"))

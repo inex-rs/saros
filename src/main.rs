@@ -286,7 +286,7 @@ async fn touch_session(
         .filter(|v| v.starts_with("Bearer "))
         .map(str::to_string)
     {
-        // Resolve the client IP as the rate limiter does (Fly-first).
+        // Resolve the client IP as the rate limiter does (X-Forwarded-For first).
         let peer = request
             .extensions()
             .get::<axum::extract::ConnectInfo<std::net::SocketAddr>>()
