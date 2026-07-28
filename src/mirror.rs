@@ -1,7 +1,7 @@
 //! Egress mirror: a content-addressed, deduplicated copy of published blobs in
 //! object storage (S3/Tigris) — serve-only, never a source of truth or listed.
 
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use object_store::aws::{AmazonS3, AmazonS3Builder};
 use object_store::signer::Signer as _;
@@ -72,34 +72,44 @@ impl Mirror {
 
     /// Is the blob already mirrored? A single keyed HEAD — never a list.
     pub async fn has(&self, sha: &str) -> std::io::Result<bool> {
-        match self.s3.head(&Self::key(sha)).await {
+        let started = Instant::now();
+        let result = match self.s3.head(&Self::key(sha)).await {
             Ok(_) => Ok(true),
             Err(object_store::Error::NotFound { .. }) => Ok(false),
             Err(e) => Err(io(e)),
-        }
+        };
+        crate::telemetry::mirror_op("head", result.is_ok(), started.elapsed());
+        result
     }
 
     pub async fn put_if_absent(&self, sha: &str, content: &[u8]) -> std::io::Result<()> {
         if self.has(sha).await? {
             return Ok(());
         }
-        self.s3
+        let started = Instant::now();
+        let result = self
+            .s3
             .put(&Self::key(sha), PutPayload::from(content.to_vec()))
             .await
-            .map_err(io)?;
-        Ok(())
+            .map_err(io);
+        crate::telemetry::mirror_op("put", result.is_ok(), started.elapsed());
+        result.map(|_| ())
     }
 
     pub async fn url(&self, sha: &str) -> std::io::Result<String> {
-        match &self.public_base {
-            Some(base) => Ok(format!("{}/blobs/{sha}", base.trim_end_matches('/'))),
-            None => self
+        // Only the presigning path is a round trip worth timing.
+        let Some(base) = &self.public_base else {
+            let started = Instant::now();
+            let result = self
                 .s3
                 .signed_url(http::Method::GET, &Self::key(sha), URL_TTL)
                 .await
                 .map(|u| u.to_string())
-                .map_err(io),
-        }
+                .map_err(io);
+            crate::telemetry::mirror_op("sign", result.is_ok(), started.elapsed());
+            return result;
+        };
+        Ok(format!("{}/blobs/{sha}", base.trim_end_matches('/')))
     }
 }
 

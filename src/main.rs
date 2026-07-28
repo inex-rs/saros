@@ -29,6 +29,13 @@ const DEFAULT_LISTEN: &str = "127.0.0.1:7171";
 #[cfg(not(debug_assertions))]
 const DEFAULT_LISTEN: &str = "0.0.0.0:8080";
 
+/// Not the `http_service` port: Fly scrapes `[metrics]` over the private
+/// network, which is 6PN, so release binds dual-stack.
+#[cfg(debug_assertions)]
+const DEFAULT_METRICS_LISTEN: &str = "127.0.0.1:9091";
+#[cfg(not(debug_assertions))]
+const DEFAULT_METRICS_LISTEN: &str = "[::]:9091";
+
 /// Saros — inex's hosted firmware registry server (ConnectRPC).
 #[derive(Parser)]
 #[command(version, about)]
@@ -36,6 +43,10 @@ struct ServeArgs {
     /// Address to listen on.
     #[arg(long, default_value = DEFAULT_LISTEN)]
     listen: std::net::SocketAddr,
+
+    /// Address serving Prometheus `/metrics`; must match `[metrics]` in fly.toml.
+    #[arg(long, default_value = DEFAULT_METRICS_LISTEN, env = "SAROS_METRICS_LISTEN")]
+    metrics_listen: std::net::SocketAddr,
 
     /// Service bearer token (CI, dump pipelines) — full access.
     #[arg(long, env = "SAROS_TOKEN")]
@@ -77,10 +88,13 @@ fn build_mirror(cfg: &saros::mirror::S3Config) -> anyhow::Result<saros::mirror::
 async fn serve(args: ServeArgs) -> anyhow::Result<()> {
     let ServeArgs {
         listen,
+        metrics_listen,
         service_token,
         admin_users,
         rp_origin,
     } = args;
+    // First, so nothing recorded during startup is dropped.
+    let (http_metrics, prometheus) = saros::telemetry::install();
     let data = PathBuf::from(DATA_DIR);
     if service_token.is_none() && admin_users.is_empty() {
         tracing::warn!(
@@ -135,6 +149,16 @@ async fn serve(args: ServeArgs) -> anyhow::Result<()> {
     spawn_metrics_persist(metrics_db.clone(), store.clone(), metrics.clone());
     spawn_incoming_gc(store.clone(), INCOMING_GC_MAX_AGE);
 
+    // Seed the gauges so a scrape before the first persist tick isn't blank.
+    // A listener we can't bind is logged, never fatal.
+    refresh_gauges(&store).await;
+    match saros::telemetry::spawn_exporter(metrics_listen, prometheus).await {
+        Ok(()) => tracing::info!(listen = %metrics_listen, "prometheus /metrics"),
+        Err(e) => {
+            tracing::warn!(listen = %metrics_listen, error = %e, "prometheus exporter unavailable")
+        }
+    }
+
     // Deploy middleware lives here, not in app() — the router stays embeddable/testable.
     let rate_limit = saros::ratelimit::RateLimit::new(RATE_LIMIT_PER_MIN, AUTH_RATE_LIMIT_PER_MIN);
     saros::ratelimit::spawn_prune(rate_limit.clone());
@@ -167,7 +191,9 @@ async fn serve(args: ServeArgs) -> anyhow::Result<()> {
     .layer(axum::middleware::from_fn_with_state(
         rate_limit,
         saros::ratelimit::enforce,
-    ));
+    ))
+    // Outermost, so throttled and over-cap requests are counted too.
+    .layer(http_metrics);
 
     let listener = tokio::net::TcpListener::bind(listen).await?;
     tracing::info!(listen = %listen, data = %data.display(), "saros serving");
@@ -247,6 +273,7 @@ async fn persist_metrics(db: &saros::db::Db, store: &Store, metrics: &saros::met
     let m = metrics.snapshot();
     match store.stats().await {
         Ok(s) => {
+            saros::telemetry::catalogue(&s);
             let now = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .map(|d| d.as_secs() as i64)
@@ -269,6 +296,13 @@ async fn persist_metrics(db: &saros::db::Db, store: &Store, metrics: &saros::met
     }
     if let Err(e) = db.stats().save_totals(&metrics.totals()).await {
         tracing::warn!(error = %e, "flushing metric totals failed");
+    }
+}
+
+async fn refresh_gauges(store: &Store) {
+    match store.stats().await {
+        Ok(s) => saros::telemetry::catalogue(&s),
+        Err(e) => tracing::warn!(error = %e, "catalogue gauges unset — stats read failed"),
     }
 }
 

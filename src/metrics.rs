@@ -1,6 +1,9 @@
 //! In-process operational counters for the admin dashboard: enum-indexed
 //! atomics seeded from + flushed to the store, so they read as lifetime
 //! totals across restarts (only `uptime_seconds` is since-boot).
+//!
+//! Distinct from [`crate::telemetry`], which mirrors the same events into a
+//! write-only Prometheus facade the dashboard couldn't read back.
 
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Instant;
@@ -10,8 +13,11 @@ use strum::{EnumCount, IntoEnumIterator};
 use crate::db::MetricTotals;
 
 /// One lifetime counter. Adding a variant is the whole change — seed, flush,
-/// and snapshot iterate the enum.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, strum::EnumCount, strum::EnumIter)]
+/// and snapshot iterate the enum, and the Prometheus label is derived.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, strum::EnumCount, strum::EnumIter, strum::IntoStaticStr,
+)]
+#[strum(serialize_all = "snake_case")]
 pub enum Counter {
     Downloads,
     Uploads,
@@ -48,6 +54,7 @@ impl Metrics {
 
     pub fn inc(&self, c: Counter) {
         self.counters[c as usize].fetch_add(1, Ordering::Relaxed);
+        crate::telemetry::event(c);
     }
 
     fn get(&self, c: Counter) -> u64 {

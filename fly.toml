@@ -18,3 +18,7 @@ primary_region = "syd"
     timeout = "5s"
     grace_period = "10s"
     path = "/readyz"
+
+[metrics]
+  port = 9091
+  path = "/metrics"

@@ -28,6 +28,7 @@ pub mod passkey;
 pub mod ratelimit;
 pub mod services;
 pub mod store;
+pub mod telemetry;
 
 use auth::Auth;
 use db::Db;

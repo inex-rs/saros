@@ -44,22 +44,26 @@ impl RateLimit {
         })
     }
 
-    fn bucket_for(&self, path: &str) -> Option<&Arc<DefaultKeyedRateLimiter<IpAddr>>> {
+    fn bucket_for(
+        &self,
+        path: &str,
+    ) -> Option<(&'static str, &Arc<DefaultKeyedRateLimiter<IpAddr>>)> {
         if STRICT_SUFFIXES.iter().any(|suffix| path.ends_with(suffix)) {
-            self.strict.as_ref()
+            self.strict.as_ref().map(|bucket| ("auth", bucket))
         } else {
-            self.global.as_ref()
+            self.global.as_ref().map(|bucket| ("global", bucket))
         }
     }
 
     /// Charge one request from `ip`; `Err(retry_after)` = over budget (→ `429`).
     pub fn check(&self, ip: IpAddr, path: &str) -> Result<(), Duration> {
-        let Some(bucket) = self.bucket_for(path) else {
+        let Some((tier, bucket)) = self.bucket_for(path) else {
             return Ok(());
         };
-        bucket
-            .check_key(&ip)
-            .map_err(|denied| denied.wait_time_from(self.clock.now()))
+        bucket.check_key(&ip).map_err(|denied| {
+            crate::telemetry::rate_limited(tier);
+            denied.wait_time_from(self.clock.now())
+        })
     }
 
     /// Drop buckets for caught-up IPs so the keyed map tracks the active IP set.

@@ -3,5 +3,6 @@ LABEL org.opencontainers.image.title="saros"
 LABEL org.opencontainers.image.description="inex firmware registry"
 COPY saros /usr/local/bin/saros
 EXPOSE 8080
+EXPOSE 9091
 VOLUME /data
 CMD ["saros"]
