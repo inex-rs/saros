@@ -8,9 +8,9 @@ keywords = ["firmware", "registry", "connectrpc", "webauthn"]
 categories = ["web-programming::http-server"]
 
 [dependencies]
-inex-protobufs = { version = "0.2.0", default-features = false, features = ["connect"] }
+inex-protobufs = { version = "0.3.0", default-features = false, features = ["connect"] }
 inex-devices = "0.1.0"
-connectrpc = { version = "0.8", features = ["axum", "server"] }
+connectrpc = { version = "0.9", features = ["axum", "server"] }
 axum = "0.8"
 tower-http = { version = "0.7", features = ["catch-panic", "cors", "limit"] }
 http = "1"
@@ -18,8 +18,8 @@ tokio = { version = "1", features = ["full"] }
 futures = "0.3"
 object_store = { version = "0.14", features = ["aws"] }
 notify = "8"
-toasty = "0.8"
-toasty-driver-sqlite = "0.8"
+toasty = "0.11"
+toasty-driver-sqlite = "0.11"
 parking_lot = "0.12"
 webauthn-rs = { version = "0.5", features = ["conditional-ui"] }
 webauthn-rs-proto = "0.5"
@@ -45,4 +45,4 @@ metrics-exporter-prometheus = { version = "0.18", default-features = false }
 
 [dev-dependencies]
 tempfile = "3"
-connectrpc = { version = "0.8", features = ["client"] }
+connectrpc = { version = "0.9", features = ["client"] }

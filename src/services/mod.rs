@@ -27,7 +27,10 @@ use crate::metrics::Metrics;
 use crate::passkey::{PasskeyError, Passkeys};
 use crate::store::{Store, StoreError};
 
-fn ts(secs: i64) -> inex_protobufs::buffa_rt::MessageField<Timestamp> {
+fn ts(
+    secs: i64,
+) -> inex_protobufs::buffa_rt::MessageField<Timestamp, inex_protobufs::buffa_rt::Inline<Timestamp>>
+{
     Timestamp {
         seconds: secs,
         ..Default::default()
