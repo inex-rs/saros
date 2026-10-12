@@ -133,7 +133,7 @@ impl Store {
         };
         for entry in entries.flatten() {
             if let Some(name) = entry.file_name().to_str()
-                && let Ok(sha) = Sha256Hex::try_from(name)
+                && let Ok(sha) = name.parse::<Sha256Hex>()
                 && owned.contains(&sha)
             {
                 let _ = std::fs::remove_file(entry.path());

@@ -87,7 +87,7 @@ pub(super) fn rebuild_blob_paths(index: &mut Index, root: &Path) {
     if let Ok(entries) = std::fs::read_dir(root.join("incoming")) {
         for entry in entries.flatten() {
             if let Some(name) = entry.file_name().to_str()
-                && let Ok(sha) = Sha256Hex::try_from(name)
+                && let Ok(sha) = name.parse::<Sha256Hex>()
             {
                 map.insert(sha, entry.path());
             }
@@ -100,7 +100,7 @@ pub(super) fn rebuild_blob_paths(index: &mut Index, root: &Path) {
             .join(key.version.as_str());
         for b in &fw.blobs {
             let (Ok(sha), Some(file)) = (
-                Sha256Hex::try_from(b.sha256.as_deref().unwrap_or_default()),
+                b.sha256.as_deref().unwrap_or_default().parse::<Sha256Hex>(),
                 b.filename.as_deref(),
             ) else {
                 tracing::warn!(key = %key, "manifest blob with invalid sha/filename — not indexed");
