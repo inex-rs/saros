@@ -11,8 +11,18 @@ permissions:
   packages: write
 
 jobs:
+  deny:
+    name: cargo deny
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Advisories, licences, bans and sources, per `deny.toml`. Gates the
+      # image, so a known-vulnerable dependency never reaches the deploy.
+      - uses: EmbarkStudios/cargo-deny-action@v2
+
   image:
     name: saros image
+    needs: deny
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
