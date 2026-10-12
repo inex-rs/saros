@@ -1,0 +1,51 @@
+# cargo-deny policy — `cargo deny check` (CI runs it on every push).
+#
+# Licence allow-list is exactly what the dependency tree needs today — no
+# speculative entries, so a new licence shows up as a CI failure to review
+# rather than slipping in. This repo itself is GPL-3.0-or-later.
+
+[graph]
+# Check every optional dependency, not just the default feature set.
+all-features = true
+
+[advisories]
+# Vulnerabilities are always errors. Yanked versions too.
+yanked = "deny"
+# Unmaintained crates fail only when *we* depend on them directly; a
+# transitive one is upstream's to replace and would otherwise block CI on
+# something no change here can fix.
+unmaintained = "workspace"
+ignore = []
+
+[licenses]
+allow = [
+    "Apache-2.0",
+    "BSD-3-Clause",
+    "CC0-1.0",
+    "CDLA-Permissive-2.0",
+    "GPL-3.0-or-later",
+    "ISC",
+    "MIT",
+    "MIT-0",
+    "MPL-2.0",
+    "Unicode-3.0",
+    "Unlicense",
+    "Zlib",
+]
+confidence-threshold = 0.93
+
+[licenses.private]
+# `publish = false` crates (firmware images, examples, tools) are never
+# distributed on their own; their licence is the repo's.
+ignore = true
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+# Path dependencies of unpublished crates carry no version; that is fine.
+allow-wildcard-paths = true
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
