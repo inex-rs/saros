@@ -1576,6 +1576,8 @@ dependencies = [
 [[package]]
 name = "inex-protobufs"
 version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "38474e9e2f3f596ce458a29acf95a89f89deffd03fc581d6bd7a97af75eb2d40"
 dependencies = [
  "buffa",
  "buffa-types",
