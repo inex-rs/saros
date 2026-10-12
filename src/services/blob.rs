@@ -54,7 +54,7 @@ impl BlobService for ConnectBlobService {
     ) -> ServiceResult<pb::StatResponse> {
         require_signed_in(&caller_of(&self.auth, &ctx).await, "stat blobs")?;
         let sha256 = request.to_owned_message().sha256.unwrap_or_default();
-        let sha = Sha256Hex::try_from(sha256.as_str())?;
+        let sha = sha256.as_str().parse::<Sha256Hex>()?;
         let size = self.store.stat_blob(&sha).await?;
         Response::ok(pb::StatResponse {
             exists: Some(size.is_some()),
@@ -70,7 +70,7 @@ impl BlobService for ConnectBlobService {
     ) -> ServiceResult<pb::DownloadResponse> {
         require_signed_in(&caller_of(&self.auth, &ctx).await, "download blobs")?;
         let sha256 = request.to_owned_message().sha256.unwrap_or_default();
-        let sha = Sha256Hex::try_from(sha256.as_str())?;
+        let sha = sha256.as_str().parse::<Sha256Hex>()?;
         let resp = match self
             .store
             .download(&sha)

@@ -67,9 +67,9 @@ impl Sha256Hex {
     }
 }
 
-impl TryFrom<&str> for Sha256Hex {
-    type Error = StoreError;
-    fn try_from(s: &str) -> Result<Self, StoreError> {
+impl std::str::FromStr for Sha256Hex {
+    type Err = StoreError;
+    fn from_str(s: &str) -> Result<Self, StoreError> {
         if s.len() != 64
             || !s
                 .bytes()
@@ -105,9 +105,9 @@ impl DeviceId {
     }
 }
 
-impl TryFrom<&str> for DeviceId {
-    type Error = StoreError;
-    fn try_from(s: &str) -> Result<Self, StoreError> {
+impl std::str::FromStr for DeviceId {
+    type Err = StoreError;
+    fn from_str(s: &str) -> Result<Self, StoreError> {
         let ok = !s.is_empty()
             && s.len() <= 100
             && !s.starts_with('.')
@@ -140,9 +140,9 @@ impl Version {
     }
 }
 
-impl TryFrom<&str> for Version {
-    type Error = StoreError;
-    fn try_from(v: &str) -> Result<Self, StoreError> {
+impl std::str::FromStr for Version {
+    type Err = StoreError;
+    fn from_str(v: &str) -> Result<Self, StoreError> {
         let ok = !v.is_empty()
             && v.len() <= 100
             && v.split('.')
@@ -173,8 +173,8 @@ pub struct Key {
 impl Key {
     pub fn of(device: &str, version: &str) -> Result<Self, StoreError> {
         Ok(Self {
-            device: DeviceId::try_from(device)?,
-            version: Version::try_from(version)?,
+            device: device.parse::<DeviceId>()?,
+            version: version.parse::<Version>()?,
         })
     }
 

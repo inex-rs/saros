@@ -50,7 +50,7 @@ impl Store {
                     cat.firmware_slots.len()
                 )));
             }
-            let sha = Sha256Hex::try_from(blob.sha256.as_deref().unwrap_or_default())?;
+            let sha = blob.sha256.as_deref().unwrap_or_default().parse::<Sha256Hex>()?;
             let file = blob.filename.clone().unwrap_or_default();
             check_basename(&file)?;
             if !index.blob_paths.contains_key(&sha) {

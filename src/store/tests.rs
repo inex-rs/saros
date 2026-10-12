@@ -33,11 +33,11 @@ fn fw(device: &str, version: &str, sha: &Sha256Hex) -> Firmware {
 
 #[test]
 fn versions_must_be_numeric() {
-    assert!(Version::try_from("3.23").is_ok());
-    assert!(Version::try_from("0.2.1").is_ok());
+    assert!("3.23".parse::<Version>().is_ok());
+    assert!("0.2.1".parse::<Version>().is_ok());
     for bad in ["", "1.0-rc1", "v1.2", "1..2", "1.2."] {
         assert!(
-            Version::try_from(bad).is_err(),
+            bad.parse::<Version>().is_err(),
             "{bad:?} should be rejected"
         );
     }
