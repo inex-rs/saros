@@ -278,7 +278,6 @@ impl Store {
             .live
             .values()
             .filter_map(|f| f.device_id.clone())
-            .filter(|d| inex_devices::by_id(d).is_some())
             .collect::<HashSet<_>>()
             .len() as u64;
         Ok(Stats {

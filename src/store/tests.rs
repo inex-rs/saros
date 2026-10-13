@@ -164,6 +164,34 @@ async fn get_blob_refuses_content_that_doesnt_match_its_sha() {
 }
 
 #[tokio::test]
+async fn rescan_indexes_only_catalogued_devices_under_their_own_dir() {
+    let dir = tempfile::tempdir().unwrap();
+    let s = open(dir.path(), 1024).await;
+    let sha = s.put_blob(b"fw!!").await.unwrap();
+    s.publish(fw("pocket-debug", "0.1.0", &sha)).await.unwrap();
+    // Dropped in from outside: a device the catalogue has never heard of,
+    // and a manifest filed under a dir that names another version.
+    for (dir_key, manifest) in [
+        ("no-such-device/1.0.0", fw("no-such-device", "1.0.0", &sha)),
+        ("pocket-debug/0.2.0", fw("pocket-debug", "0.3.0", &sha)),
+    ] {
+        let vdir = dir.path().join("firmware").join(dir_key);
+        std::fs::create_dir_all(&vdir).unwrap();
+        std::fs::write(
+            vdir.join("manifest.json"),
+            serde_json::to_vec(&manifest).unwrap(),
+        )
+        .unwrap();
+    }
+    s.reload().unwrap();
+    let listed = s.list(None).await;
+    assert_eq!(listed.len(), 1, "{listed:?}");
+    assert_eq!(listed[0].version.as_deref(), Some("0.1.0"));
+    let stats = s.stats().await.unwrap();
+    assert_eq!((stats.devices, stats.firmware), (1, 1));
+}
+
+#[tokio::test]
 async fn open_reaps_orphaned_tmp_artifacts() {
     let dir = tempfile::tempdir().unwrap();
     let tmp_ver = dir.path().join("firmware/pocket-debug/.tmp-deadbeef");

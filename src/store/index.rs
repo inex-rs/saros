@@ -48,7 +48,7 @@ impl Store {
 pub(super) fn scan(root: &Path) -> Result<Index, StoreError> {
     let mut index = Index::default();
     for (key, dir) in version_dirs(&root.join("firmware")) {
-        match read_manifest(&dir.join("manifest.json")) {
+        match read_manifest(&key, &dir.join("manifest.json")) {
             Ok(fw) => {
                 index.live.insert(key, fw);
             }
@@ -56,7 +56,7 @@ pub(super) fn scan(root: &Path) -> Result<Index, StoreError> {
         }
     }
     for (key, dir) in version_dirs(&root.join("staging")) {
-        match read_manifest(&dir.join("manifest.json")) {
+        match read_manifest(&key, &dir.join("manifest.json")) {
             Ok(fw) => {
                 let submitted_by = std::fs::read_to_string(dir.join("submitted-by"))
                     .unwrap_or_default()
@@ -147,6 +147,11 @@ fn version_dirs(base: &Path) -> Vec<(Key, PathBuf)> {
                 continue;
             }
             match Key::of(&device, &version) {
+                // External drops can name a device the catalogue doesn't know;
+                // indexing it would count versions and blobs no device lists.
+                Ok(key) if inex_devices::by_id(key.device.as_str()).is_none() => {
+                    tracing::warn!(dir = %ver.path().display(), "skipping firmware for a device not in the catalogue")
+                }
                 Ok(key) => out.push((key, ver.path())),
                 Err(e) => {
                     tracing::warn!(dir = %ver.path().display(), error = %e, "skipping invalid version dir")
@@ -157,9 +162,22 @@ fn version_dirs(base: &Path) -> Vec<(Key, PathBuf)> {
     out
 }
 
-fn read_manifest(path: &Path) -> Result<Firmware, StoreError> {
+/// A version dir's manifest, which must name the device and version its dir
+/// does: the dir is the index key, the manifest what gets served under it.
+fn read_manifest(key: &Key, path: &Path) -> Result<Firmware, StoreError> {
     let bytes = std::fs::read(path)?;
-    serde_json::from_slice(&bytes).map_err(|e| StoreError::Decode(e.to_string()))
+    let fw: Firmware =
+        serde_json::from_slice(&bytes).map_err(|e| StoreError::Decode(e.to_string()))?;
+    if fw.device_id.as_deref() != Some(key.device.as_str())
+        || fw.version.as_deref() != Some(key.version.as_str())
+    {
+        return Err(StoreError::Decode(format!(
+            "manifest names {}/{}, not its dir {key}",
+            fw.device_id.as_deref().unwrap_or_default(),
+            fw.version.as_deref().unwrap_or_default(),
+        )));
+    }
+    Ok(fw)
 }
 
 /// Write via temp file + rename (no torn reads), fsync'd (file then dir) so an
